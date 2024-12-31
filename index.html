@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#E6E6FA">
+    <title>Minimalist Calendar</title>
+    <link rel="icon" href="/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: Arial, sans-serif;
+        }
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #000000;
+        }
+        .calendar-container {
+            position: relative; /* Allows absolute positioning for the watermark */
+            width: 90vw;
+            max-width: 500px;
+            padding: 20px;
+            background: white;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            text-align: center;
+            border: 10px solid orange;
+            border-radius: 15px;
+            background-color: #E6E6FA;
+            overflow: hidden;
+        }
+        .current-date {
+            font-size: 18px;
+            margin-bottom: 20px;
+        }
+        .calendar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            font-size: 20px;
+        }
+        .calendar-content {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 5px;
+        }
+        .calendar-content div {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 50px;
+            width: 50px;
+            font-size: 18px;
+            border-radius: 50%;
+        }
+        .calendar-content .day {
+            font-weight: bold;
+            color: #FF5733;
+        }
+        .calendar-content .date {
+            background-color: #f9f9f9;
+            color: #333;
+        }
+        .calendar-content .current-day {
+            background-color: #4CAF50;
+            color: white;
+        }
+        .calendar-content .current-day-name {
+            background-color: #FFD700;
+            color: black;
+        }
+        .arrow {
+            font-size: 24px;
+            cursor: pointer;
+            background-color: #4CAF50;
+            color: white;
+            border-radius: 50%;
+            padding: 10px;
+            margin: 0 5px;
+        }
+        .watermark {
+            font-size: 12px;
+            color: #fff;
+            background-color: rgba(0, 0, 0, 0.5);
+            padding: 5px 10px;
+            border-radius: 10px;
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            z-index: 10;
+        }
+        .add-to-home-button {
+            background-color: #4285f4;
+            color: #fff;
+            display: block;
+            margin: 20px auto;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .add-to-home-button:hover {
+            background-color: #357ae8;
+        }
+
+        /* Media query for mobile devices */
+        @media (max-width: 600px) {
+            .calendar-container {
+                width: 100vw;
+                padding: 10px;
+                border-width: 5px;
+            }
+            .calendar-content div {
+                height: 40px;
+                width: 40px;
+                font-size: 14px;
+            }
+            .arrow {
+                font-size: 20px;
+                padding: 5px;
+            }
+            .current-date, .calendar-header {
+                font-size: 16px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="calendar-container">
+        <div class="current-date" id="currentDate">Today: </div>
+        <div class="calendar-header">
+            <span class="arrow" id="prevMonth">&#8592;</span>
+            <span id="monthYear"></span>
+            <span class="arrow" id="nextMonth">&#8594;</span>
+        </div>
+        <div class="calendar-content" id="calendarGrid">
+            <!-- Days of the week will go here dynamically -->
+        </div>
+        <button class="add-to-home-button" id="addToHomeButton" style="display: none;">Add to Home Screen</button>
+        <div class="watermark">Created by RAHUL KUMAR</div> <!-- Watermark -->
+    </div>
+
+    <script>
+        if ("serviceWorker" in navigator) {
+            window.addEventListener("load", () => {
+                navigator.serviceWorker.register("/service-worker.js")
+                    .then((registration) => {
+                        console.log("Service Worker registered with scope:", registration.scope);
+                    })
+                    .catch((error) => {
+                        console.error("Service Worker registration failed:", error);
+                    });
+            });
+        }
+
+        let deferredPrompt;
+        const addToHomeButton = document.getElementById('addToHomeButton');
+
+        window.addEventListener('beforeinstallprompt', (e) => {
+            console.log('beforeinstallprompt event fired');
+            e.preventDefault();
+            deferredPrompt = e;
+            addToHomeButton.style.display = 'block';
+        });
+
+        addToHomeButton.addEventListener('click', () => {
+            addToHomeButton.style.display = 'none';
+            deferredPrompt.prompt();
+            deferredPrompt.userChoice.then((choiceResult) => {
+                if (choiceResult.outcome === 'accepted') {
+                    console.log('User accepted the A2HS prompt');
+                } else {
+                    console.log('User dismissed the A2HS prompt');
+                }
+                deferredPrompt = null;
+            });
+        });
+
+        const currentDateElem = document.getElementById('currentDate');
+        const monthYearElem = document.getElementById('monthYear');
+        const calendarGridElem = document.getElementById('calendarGrid');
+        const prevMonthElem = document.getElementById('prevMonth');
+        const nextMonthElem = document.getElementById('nextMonth');
+
+        let today = new Date();
+        let currentMonth = today.getMonth();
+        let currentYear = today.getFullYear();
+
+        const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+        const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+        function renderCalendar(month, year) {
+            calendarGridElem.innerHTML = '';
+            let firstDay = new Date(year, month).getDay();
+            let daysInMonth = new Date(year, month + 1, 0).getDate();
+
+            const adjustedFirstDay = (firstDay === 0 ? 6 : firstDay - 1);
+
+            currentDateElem.innerText = `Today: ${today.toDateString()}`;
+            monthYearElem.innerText = `${monthNames[month]} ${year}`;
+
+            for (let i = 0; i < 7; i++) {
+                const dayElem = document.createElement('div');
+                dayElem.classList.add('day');
+                dayElem.textContent = weekdays[i];
+                
+                if (today.getDay() === (i + 1) % 7 && month === today.getMonth() && year === today.getFullYear()) {
+                    dayElem.classList.add('current-day-name');
+                }
+
+                calendarGridElem.appendChild(dayElem);
+            }
+
+            let dayCounter = 1;
+
+            for (let i = 0; i < 42; i++) {
+                const dateElem = document.createElement('div');
+                dateElem.classList.add('date');
+
+                if (i >= adjustedFirstDay && dayCounter <= daysInMonth) {
+                    dateElem.textContent = dayCounter;
+
+                    if (dayCounter === today.getDate() && month === today.getMonth() && year === today.getFullYear()) {
+                        dateElem.classList.add('current-day');
+                    }
+
+                    dayCounter++;
+                }
+
+                calendarGridElem.appendChild(dateElem);
+            }
+        }
+
+        function changeMonth(direction) {
+            currentMonth += direction;
+            if (currentMonth < 0) {
+                currentMonth = 11;
+                currentYear--;
+            } else if (currentMonth > 11) {
+                currentMonth = 0;
+                currentYear++;
+            }
+            renderCalendar(currentMonth, currentYear);
+        }
+
+        prevMonthElem.addEventListener('click', () => changeMonth(-1));
+        nextMonthElem.addEventListener('click', () => changeMonth(1));
+
+        renderCalendar(currentMonth, currentYear);
+    </script>
+</body>
+</html>
